@@ -5,7 +5,7 @@
 #define OUTPUT_PIN_FORWARD 4
 #define OUTPUT_PIN_BACKWARD 5
 #define PULSE_PER_REV 720
-#define h 10
+#define h 100
 
 volatile int encoderPos=0;
 volatile unsigned long lastPulseTime=0;
@@ -13,68 +13,60 @@ float angularVelocity = 0;
 
 Adafruit_MPU6050 mpu;
 
-double x1,x2,x3,x4,y1,y2,y3,r1,r2,r3,precalc1,precalc2,precalc3,precalc4;
+double x1,x2,x3,x4,y,y1,y2,y3,r,r1,r2,r3,precalc1,precalc2,precalc3,precalc4;
   int u;
   int AB, ABnew;
   
-  double hat11=-457.807;
-  double hat12=-35977.015;
-  double hat13=-37.455;
-  double hat14=-2935.835;
-  double hat21=-3.976;
-  double hat22=-311.571;
-  double hat23=-0.325;
-  double hat24=-25.507;
-  double hat31=5586.930;
-  double hat32=438095.815;
-  double hat33=457.094;
-  double hat34=35749.646;
-  double hat41=48.626;
-  double hat42=3812.971;
-  double hat43=3.980;
-  double hat44=312.147;
-
-  double r11,r12,r21,r22,r31,r32,r41,r42;
-  double r13=2935.835;
-  double r23=25.507;
-  double r33=-35749.646;
-  double r43=-311.147;
-
-  double LC13, LC23, LC33, LC43;
-  double LC11=0.991;
-  double LC12=0.274;
-  double LC14=-0.138;
-  double LC21=0.337;
-  double LC22=0.875;
-  double LC24=0.422;
-  double LC31=0.200;
-  double LC32=-0.526;
-  double LC34=-0.211;
-  double LC41=-0.155;
-  double LC42=-0.168;
-  double LC44=0.855;
-
-  double L11=0.991;
-  double L12=0.274;
-  double L13=-0.138;
-  double L21=0.337;
-  double L22=0.875;
-  double L23=0.422;
-  double L31=0.200;
-  double L32=-0.526;
-  double L33=-0.211;
-  double L41=-0.155;
-  double L42=-0.168;
-  double L43=0.855;
-
-  double K1 = 0.115;
-  double K2 = -0.771;
-  double K3 = -0.422;
-  double K4 = -0.003;
-
-  double kr1 = 0;
-  double kr2 = 0;
-  double kr3 = -15214.341;
+double hat11 = 0.9536;
+double hat12 = -3.2408;
+double hat13 = 0.078;
+double hat14 = -0.2936;
+double hat21 = 0.0096;
+double hat22 = 0.9707;
+double hat23 = 0.0007;
+double hat24 = -0.0026;
+double hat31 = 0.6074;
+double hat32 = 43.4105;
+double hat33 = 0.0502;
+double hat34 = 3.575;
+double hat41 = 0.0053;
+double hat42 = 0.3778;
+double hat43 = 0.0017;
+double hat44 = 1.0311;
+ 
+double r11 = -183.3167;
+double r21 = -1.5927;
+double r31 = 2232.2468;
+double r41 = 19.4284;
+ 
+double L11 = 0.004;
+double L21 = -0.7;
+double L31 = 0.0003;
+double L41 = 0;
+ 
+double LC11 = 0;
+double LC12 = 0.004;
+double LC13 = 0;
+double LC14 = 0;
+double LC21 = 0;
+double LC22 = -0.7;
+double LC23 = 0;
+double LC24 = 0;
+double LC31 = 0;
+double LC32 = 0.0003;
+double LC33 = 0;
+double LC34 = 0;
+double LC41 = 0;
+double LC42 = 0;
+double LC43 = 0;
+double LC44 = 0;
+ 
+double kr11 = 950;
+ 
+double K11 = -0.2378;
+double K12 = -18.6445;
+double K13 = -0.0195;
+double K14 = -1.5214;
 
 void setup() {
   // put your setup code here, to run once:
@@ -93,6 +85,8 @@ void setup() {
   lastPulseTime = micros();
 
   AB=encoder();
+
+  r=0; //Refernce value
   
   mpu.begin();
   delay(1000); //stabilaze
@@ -127,6 +121,15 @@ float hast(){
    AB=ABnew;
 }
 
+double limit(double value, int uppLim, int lowLim){
+  if(value>uppLim){
+    value=uppLim;
+  } else if(value<lowLim){
+    value=lowLim;
+  }
+  return value;
+}
+
 void loop() {
 
 long time = millis();
@@ -140,38 +143,47 @@ float pitchspeed = gyro.gyro.z; //y1
 float angle = 2 * 3.142 * encoderPos/PULSE_PER_REV; // mod360? Bryr vi oss om det är över 360 grader?
 //y3
 
-y1=pitchspeed;
+/*y1=pitchspeed;
 y2=pitch;
-y3=angle;
+y3=angle;*/
 
-Serial.print("y1/pitchspeed: ");
+y=pitch;
+
+/*Serial.print("y1/pitchspeed: ");
 Serial.println(pitchspeed);  
 Serial.print("y2/pitch: ");
 Serial.println(pitch);
 Serial.print("y3/angle: ");
 Serial.println(angle); 
-Serial.println(); 
+Serial.println(); */
 
 //Beräkningar med nya värden
-x1 = r11*r1 + r12*r2 + r13*r3 + L11*y1 + L12*y2 + L13*y3 + precalc1; 
-x2 = r21*r1 + r22*r2 + r23*r3 + L21*y1 + L22*y2 + L23*y3 + precalc2;
-x3 = r31*r1 + r32*r2 + r33*r3 + L31*y1 + L32*y2 + L33*y3 + precalc3;
-x4 = r41*r1 + r42*r2 + r43*r3 + L41*y1 + L42*y2 + L43*y3 + precalc4;
-u = kr1*r1 + kr2*r2 + kr3*r3 - K1*x1 - K2*x2 - K3*x3 - K4*x4;
+x1 = r11*r + L11*y + precalc1; 
+x2 = r21*r + L21*y + precalc2;
+x3 = r31*r + L31*y + precalc3;
+x4 = r41*r + L41*y + precalc4;
+u = kr11*r - K11*x1 - K12*x2 - K13*x3 - K14*x4;
 
-if(u>255){
-  u=255;
-} else if(u<-255){
-  u=-255;
-}
+x1 = limit(x1,10000,-10000);
+x2 = limit(x2,10000,-10000);
+x3 = limit(x3,10000,-10000);
+x4 = limit(x4,10000,-10000);
+u = limit(u, 255, -255);
+
+Serial.println(x1);
+Serial.println(x2);
+Serial.println(x3);
+Serial.println(x4);
+Serial.println(u);
+Serial.println();
 
 //Output
 if(u > 0){
-  digitalWrite(OUTPUT_PIN_FORWARD,u);
-  digitalWrite(OUTPUT_PIN_BACKWARD,0);
+  analogWrite(OUTPUT_PIN_FORWARD,255-u); //Under antagandet att regulatorn tror att 255 är max och för motorn är det 0
+  analogWrite(OUTPUT_PIN_BACKWARD,255);
 } else {
-  digitalWrite(OUTPUT_PIN_FORWARD,0);
-  digitalWrite(OUTPUT_PIN_BACKWARD,-u);
+  analogWrite(OUTPUT_PIN_FORWARD,255);
+  analogWrite(OUTPUT_PIN_BACKWARD,255+u);
 }
 
 
