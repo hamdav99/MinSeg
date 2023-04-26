@@ -1,0 +1,198 @@
+A = [-3.1 58.4 62.7 0; 
+    1 0 0 0;
+    40.1 -318 -766 0;
+    0 0 1 0];
+
+B = [-148; 0; 1808; 0];
+
+%C = [1 0 0 0;
+%    0 1 0 0;
+ %   0 0 0 0;
+  %  0 0 0 1];
+  C = [0, 1, 0, 0];
+D = [0;
+    0;
+    0;
+    0];
+%SP = ss(A, B, C, D) %state space model
+%P = tf(SP) %transfer
+pk = [2+2*1i, 2-2*1i, 3+3*1i, 3-3*1i]; %poles
+pl = [4+4*1i, 4-4*1i, 6+6*1i, 6-6*1i];
+K = place(A, B, pk) %place poles
+L = place(A', C', pl)'
+
+%% 
+sympref('FloatingPointOutput', true)
+A = [-3.1 58.4 62.7 0; 
+    1 0 0 0;
+    40.1 -318 -766 0;
+    0 0 1 0];
+
+B = [-148; 0; 1808; 0];
+
+%C = [1 0 0 0;
+%    0 1 0 0;
+ %   0 0 0 0;
+  %  0 0 0 1];
+  C = [0, 1, 0, 0];
+D = 0;
+SP = ss(A, B, C, D); %state space model
+h = 0.1;
+SYSD = c2d(SP, h, 'zoh'); %zero order hold, cont to disc
+Phi = SYSD.A;
+Gamma = SYSD.B;
+syms ('k1', 'k2', 'k3', 'k4') %symbolisk K matris
+K = [k1, k2, k3, k4];
+I = eye(4); %enhetsmatris 4x4
+syms z
+det((z*I-Phi) + Gamma*K); %determinant
+
+%% 
+sympref('FloatingPointOutput', true);
+format long g
+A = [-3.1 58.4 62.7 0; 
+    1 0 0 0;
+    40.1 -318 -766 0;
+    0 0 1 0];
+
+B = [-148; 0; 1808; 0];
+
+C = [0 1 0 0];
+%C = [1 0 0 0;
+ %   0 1 0 0;
+  %  0 0 0 1];
+
+D = 0;
+
+polesContK = [-40+40*1i, -40-40*1i, -2-2*1i, -2+2*1i];
+polesContL = [-2-2*1i, -2+2*1i, -1-1*1i, -1+1*1i];
+Kcont = place(A, B, polesContK); %cont time
+%Lcont = place(A', C', polesContL)';
+SP = ss(A, B, C, D); %state space model
+h = 0.02; %not used in segway lab
+SYSD = c2d(SP, h, 'zoh'); %zero order hold, cont to disc
+Phi = SYSD.A;
+Gamma = SYSD.B;
+polesDiscK = exp(polesContK*h); %poles in discrete time
+polesDiscL = exp(polesDiscK*h); %Måste väl ta gånger h?
+Kdisc = place(Phi, Gamma, polesDiscK);
+Ldisc = [0.00399;
+    -0.7;
+    0.000273;
+    0];
+%kr = 1/(C*inv(eye(4)- Phi + Gamma*Kdisc)*Gamma); %static unit gain (Blir
+%oändligt)
+kr = 0; %beräknat till 950 för hand
+%%%%%%%%%%%%%%%%%%%%%%
+xHattMatrix = Phi-Gamma*Kdisc;
+rMatrix = Gamma*kr;
+LMatrix = Ldisc*C;
+
+preVar = "double ";
+varHat = "hat";
+equal = " = ";
+semiColon = ";";
+varR = "r";
+varLC = "LC";
+varL = "L";
+varK = "K";
+varkr = "kr";
+
+for i = 1:length(xHattMatrix(:,1)) %rad
+    for j = 1:length(xHattMatrix(1,:))
+        value = xHattMatrix(i,j);
+        num = round(value,4);
+        disp(append(preVar,varHat,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+disp(" ");
+
+for i = 1:length(rMatrix(:,1)) %rad
+    for j = 1:length(rMatrix(1,:))
+        value = rMatrix(i,j);
+        num = round(value,4);
+        disp(append(preVar,varR,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+disp(" ");
+
+for i = 1:length(Ldisc(:,1)) %rad
+    for j = 1:length(Ldisc(1,:))
+        value = Ldisc(i,j);
+        num = round(value,4);
+        disp(append(preVar,varL,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+disp(" ");
+
+for i = 1:length(LMatrix(:,1)) %rad
+    for j = 1:length(LMatrix(1,:))
+        value = LMatrix(i,j);
+        num = round(value,4);
+        disp(append(preVar,varLC,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+disp(" ");
+
+for i = 1:length(kr(:,1)) %rad
+    for j = 1:length(kr(1,:))
+        value = kr(i,j);
+        num = round(value,4);
+        disp(append(preVar,varkr,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+disp(" ");
+
+for i = 1:length(Kdisc(:,1)) %rad
+    for j = 1:length(Kdisc(1,:))
+        value = Kdisc(i,j);
+        num = round(value,4);
+        disp(append(preVar,varK,int2str(i),int2str(j),equal,num2str(num),semiColon));
+    end
+end
+
+precalc1 = 0;
+precalc2 = 0;
+precalc3 = 0; 
+precalc4 = 0;
+r = 0;
+x2 = 0;
+maxU=0;
+minU=0;
+
+for i = 1:1
+    y = x2 + rand * 0.1 - 0.05; % Bör gå mellan -0.1 och 0.1
+
+    x1 = rMatrix(1,1)*r + Ldisc(1,1)*y + precalc1; 
+    x2 = rMatrix(2,1)*r + Ldisc(2,1)*y + precalc2;
+    x3 = rMatrix(3,1)*r + Ldisc(3,1)*y + precalc3;
+    x4 = rMatrix(4,1)*r + Ldisc(4,1)*y + precalc4;
+    u = kr*r - Kdisc(1,1)*x1 - Kdisc(1,2)*x2 - Kdisc(1,3)*x3 - Kdisc(1,4)*x4;
+    
+if (u > maxU)
+    maxU=u;
+end
+
+if(u < minU)
+    minU=u;
+end
+
+    disp(append("x1 = ",num2str(x1)));
+    disp(append("x2 = ",num2str(x2)));
+    disp(append("x3 = ",num2str(x3)));
+    disp(append("x4 = ",num2str(x4)));
+    disp(append("u = ",num2str(u)));
+    disp(" ");
+
+    precalc1 = xHattMatrix(1,1)*x1 + xHattMatrix(1,2)*x2 + xHattMatrix(1,3)*x3 + xHattMatrix(1,4)*x4 - LMatrix(1,1)*x1 - LMatrix(1,2)*x2 - LMatrix(1,3)*x3 - LMatrix(1,4)*x4; 
+    precalc2 = xHattMatrix(2,1)*x1 + xHattMatrix(2,2)*x2 + xHattMatrix(2,3)*x3 + xHattMatrix(2,4)*x4 - LMatrix(2,1)*x1 - LMatrix(2,2)*x2 - LMatrix(2,3)*x3 - LMatrix(2,4)*x4;
+    precalc3 = xHattMatrix(3,1)*x1 + xHattMatrix(3,2)*x2 + xHattMatrix(3,3)*x3 + xHattMatrix(3,4)*x4 - LMatrix(3,1)*x1 - LMatrix(3,2)*x2 - LMatrix(3,3)*x3 - LMatrix(3,4)*x4;
+    precalc4 = xHattMatrix(4,1)*x1 + xHattMatrix(4,2)*x2 + xHattMatrix(4,3)*x3 + xHattMatrix(4,4)*x4 - LMatrix(4,1)*x1 - LMatrix(4,2)*x2 - LMatrix(4,3)*x3 - LMatrix(4,4)*x4;
+end
+maxU
+minU
