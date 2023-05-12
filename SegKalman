@@ -1,0 +1,200 @@
+#include <Adafruit_MPU6050.h>
+
+#define ENCODER_PIN_A 2
+#define ENCODER_PIN_B 3
+#define OUTPUT_PIN_FORWARD 4
+#define OUTPUT_PIN_BACKWARD 5
+#define PULSE_PER_REV 720
+#define h 20
+
+volatile int encoderPos=0;
+volatile unsigned long lastPulseTime=0;
+float angularVelocity = 0;
+
+Adafruit_MPU6050 mpu;
+
+double x1,x2,x3,x4,y,y1,y2,y3,y4,r,r1,r2,r3,precalc1,precalc2,precalc3,precalc4;
+  int u;
+  int i = 0;
+  int AB, ABnew,count,varannan;
+  float vector[8];
+  float sum;
+
+double IMU_A11 = 0.382;
+double IMU_A12 = -0.0015;
+double IMU_A21 = 0.0001;
+double IMU_A22 = 0.9911;
+
+double IMU_B11 = 0.618;
+double IMU_B12 = 0.0015;
+double IMU_B21 = 0.0199;
+double IMU_B22 = 0.0089;
+
+double IMU_C11 = 0.382;
+double IMU_C12 = -0.0015;
+double IMU_C21 = -0.0075;
+double IMU_C22 = 0.9911;
+
+double IMU_D11 = 0.618;
+double IMU_D12 = 0.0015;
+double IMU_D21 = 0.0075;
+double IMU_D22 = 0.0089;
+
+double wheel_A11 = 1;
+double wheel_A12 = -9.908;
+double wheel_A21 = 0.02;
+double wheel_A22 = 0.2636;
+
+double wheel_B11 = 9.908;
+double wheel_B21 = 0.7364;
+
+double wheel_C11 = 1;
+double wheel_C12 = -9.908;
+double wheel_C21 = 0;
+double wheel_C22 = 0.4618;
+
+double wheel_D11 = 9.908;
+double wheel_D21 = 0.5382;
+
+   
+double K11 = -13.5;
+double K12 = -73.6;
+double K13 = 1.1;
+double K14 = 0.2;
+
+void setup() {
+  // put your setup code here, to run once:
+  //Deklarera alla parametrar
+  Serial.begin(9600);
+  pinMode(ENCODER_PIN_A,INPUT_PULLUP);
+  pinMode(ENCODER_PIN_B,INPUT_PULLUP);
+
+  attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_A), hast, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ENCODER_PIN_B), hast, CHANGE);
+  
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setAccelerometerRange(MPU6050_RANGE_4_G);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  
+  lastPulseTime = micros();
+
+  AB=encoder();
+
+  r=0; //Refernce value
+  
+  mpu.begin();
+  delay(1000); //stabilaze
+}
+
+int encoder(){
+  int a = digitalRead(ENCODER_PIN_A);
+  int b = digitalRead(ENCODER_PIN_B);
+
+  if(a==0 & b==0){
+    return 0;
+  } else if (a==0 & b==1){
+    return 1;
+  } else if( a==1 & b==0){
+    return 2;
+  } else {
+    return 3;
+  }
+}
+
+float hast(){
+
+  ABnew=encoder();
+  int temp = encoderPos;
+  
+  switch(ABnew){
+    case 0: if(AB==2) encoderPos++; else encoderPos--; break;
+    case 1: if(AB==0) encoderPos++; else encoderPos--; break;
+    case 2: if(AB==3) encoderPos++; else encoderPos--; break;
+    case 3: if(AB==1) encoderPos++; else encoderPos--; break;
+  }
+
+   AB=ABnew;
+   
+   if(encoderPos == temp+1){
+      count++;
+   }else{
+      count--;
+   }
+  
+}
+
+double limit(double value, int uppLim, int lowLim){
+  if(value>uppLim){
+    value=uppLim;
+  } else if(value<lowLim){
+    value=lowLim;
+  }
+  return value;
+}
+
+void loop() {
+
+long time = millis(); //Loopen verkar bara köra var 80ms trots h=10ms
+//Serial.println(time);
+
+float anglespeed = ((count * 2 * 3.142*1000)/h)/PULSE_PER_REV;
+  count=0;
+
+//Nya värden
+sensors_event_t accel, gyro; 
+mpu.getAccelerometerSensor()->getEvent(&accel);
+mpu.getGyroSensor()->getEvent(&gyro);
+float pitch = atan2(accel.acceleration.z, -accel.acceleration.y);//y2
+float pitchspeed = gyro.gyro.z; //y1
+float angle = 2 * 3.142 * encoderPos/PULSE_PER_REV; // mod360? Bryr vi oss om det är över 360 grader?
+//y3
+
+x1 = IMU_C11 * x1 + IMU_C12 * x2 + IMU_D11 * pitchspeed + IMU_D12 * pitch;
+x2 = IMU_C21 * x1 + IMU_C22 * x2 + IMU_D21 * pitchspeed + IMU_D22 * pitch;
+x3 = wheel_C11 * x3 + wheel_C12 * x4 + wheel_D11 * angle;
+x3 = wheel_C21 * x3 + wheel_C22 * x4 + wheel_D21 * angle;
+
+/*Serial.print("x1/pitchspeed: ");
+Serial.println(pitchspeed);  
+Serial.print("x2/pitch: ");
+Serial.println(pitch);
+
+Serial.print("x3/anglespeed: ");
+Serial.println(anglespeed); 
+Serial.print("x4/angle: ");
+Serial.println(angle); */
+
+
+//Beräkningar med nya värden
+u =  -2-K11*x1 - K12*x2 - K13*x3 - K14*x4; //Ändra första siffran för vinkeloffset
+
+ /*Serial.print("u: ");
+ Serial.println(u); 
+ Serial.println();*/
+
+//Output
+if(u >= 0 && pitch < 0.53 && pitch > -0.53){
+  u = 70 + u; //Ändra faktorn med u för att motorn har olika gain framåt och bakåt
+  u = limit(u, 255, -255);
+  analogWrite(OUTPUT_PIN_FORWARD,0);
+  analogWrite(OUTPUT_PIN_BACKWARD,u);
+} else if (u < 0 && pitch < 0.53 && pitch > -0.53){ //Forward motor starkare
+  u = 70 -u; //OBS går att ändra golvet också
+  u = limit(u, 255, -255);
+  analogWrite(OUTPUT_PIN_FORWARD,u);
+  analogWrite(OUTPUT_PIN_BACKWARD,0);
+} else {
+  analogWrite(OUTPUT_PIN_FORWARD,0);
+  analogWrite(OUTPUT_PIN_BACKWARD,0);
+}
+
+x1 = IMU_A11 * x1 + IMU_A12 * x2 + IMU_B11 * pitchspeed + IMU_B12 * pitch;
+x2 = IMU_A21 * x1 + IMU_A22 * x2 + IMU_B21 * pitchspeed + IMU_B22 * pitch;
+x3 = wheel_A11 * x3 + wheel_A12 * x4 + wheel_B11 * angle;
+x3 = wheel_A21 * x3 + wheel_A22 * x4 + wheel_B21 * angle;
+
+//Waitunitl
+time = time + h;
+float duration = time - millis();
+delay(duration);
+}
